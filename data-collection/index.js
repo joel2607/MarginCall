@@ -81,7 +81,7 @@ const loginNow = async () => {
 
 const getRequests = async () => {
     try {
-        const startDate = new Date('2014-02-10T09:00:00');
+        const startDate = new Date('2018-03-27T12:00:00');
         const endDate = new Date('2024-02-10T09:00:00');
         const maxDaysPerRequest = 30;
 
@@ -89,15 +89,16 @@ const getRequests = async () => {
         let i = 0;
         while (currentStart < endDate) {
 
-            //5 second delay to prevent getting ratelimited
-            await sleep(5000);
-
+            
             //Refresh login and TOTP 
             if(i %3 == 0) await loginNow();
             i++;
+            
+            //5 second delay to prevent getting ratelimited
+            await sleep(3000);
 
             const currentEnd = new Date(Math.min(currentStart.getTime() + maxDaysPerRequest * 24 * 60 * 60 * 1000, endDate.getTime()));
-            
+            await sleep(3000);
             processRequest("14366", formatDate(currentStart), formatDate(currentEnd));
             
             currentStart = new Date(currentEnd.getTime() + 60000); // Add 1 minute to avoid overlap
@@ -111,7 +112,7 @@ const getRequests = async () => {
 const main = async () => {
 
     await loginNow();
-    //await processRequest("14366", "2014-04-11 03:32", "2014-05-11 03:32")
+    //await processRequest("14366", "2024-01-01 13:31", "2024-01-01 13:43");
     await getRequests();
 }
 
