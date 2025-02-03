@@ -1,7 +1,6 @@
 let { SmartAPI, WebSocket,WebSocketV2 } = require('smartapi-javascript');
 const { TOTP  } = require('totp-generator')
 require('dotenv').config();
-
 const fs = require('fs');
 
 function appendJsonToFile(filePath, newData) {
@@ -15,15 +14,18 @@ function appendJsonToFile(filePath, newData) {
         }
     }
 
-    // Ensure it's an array, then prepend new data
+    // Ensure existing data is an array
     if (!Array.isArray(existingData)) {
-        existingData = [existingData];
+        existingData = [];
     }
-    existingData.unshift(newData); // Append on top
+
+    // Append new data at the top level (without nesting)
+    existingData.push(...newData); 
 
     // Write back to file
     fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2), 'utf-8');
 }
+
 
 let smart_api = new SmartAPI({
 	api_key: process.env.ANGEL_ONE_API_KEY, 
@@ -32,8 +34,9 @@ let smart_api = new SmartAPI({
 
 const getTOTP = () => {
     try {
+
         const {otp, expires} = TOTP.generate(process.env.ANGEL_ONE_TOTP_KEY);
-        console.log('TOTP expires at ' + expires);
+        console.log('TOTP expires at ' + new Date(expires).toLocaleTimeString());
         return otp;
     } catch (err) {
         console.log(err)
@@ -56,22 +59,14 @@ smart_api
 		    "exchange": "NSE",
 		    "symboltoken": "14366",
 		    "interval": "ONE_MINUTE",
-		    "fromdate": "2021-02-10 09:00",
+		    "fromdate": "2022-02-10 09:00",
 		    "todate": "2022-02-10 09:20"
 		})
 	})
 	.then((response) => {
 		appendJsonToFile('data.json', response.data)
+        console.log("saved to data.json")
 	})
 	.catch((ex) => {
 		console.log(ex)
 	});
-
-// // TO HANDLE SESSION EXPIRY, USERS CAN PROVIDE A CUSTOM FUNCTION AS PARAMETER TO setSessionExpiryHook METHOD
-// smart_api.setSessionExpiryHook(customSessionHook);
-
-// function customSessionHook() {
-// 	console.log('User loggedout');
-
-// 	// NEW AUTHENTICATION CAN TAKE PLACE HERE
-// }
