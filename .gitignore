@@ -169,3 +169,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Node Modules
+/data-collection/node_modules
+
+# virtual env
+/bingo
