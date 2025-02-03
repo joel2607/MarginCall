@@ -58,16 +58,90 @@ def normalized_values(high, low, close):
     close = close - low
     return close/(high + epsilon)
 
-
+def analyze_dataset(df):
+    analysis = {
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict(),
+        'unique_values': {col: df[col].nunique() for col in df.columns},
+    }
     
-def get_data(sym, start_date = None, end_date = None, n = 10):
+    # Add basic statistics for numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        analysis['numeric_stats'] = df[numeric_cols].describe().to_dict()
     
-    #change the data from ms to datetime format
-    data = pd.DataFrame(data['candles'])
-    data['date'] = pd.to_datetime(data['datetime'], unit = 'ms')
+    unique_str_values = {}
+    
+    for column in df.columns:
+        if column not in numeric_cols:
+            unique_str_values[column] = df[column].value_counts()
+    
+    analysis['non_numeric_cols'] = unique_str_values
+    
+    return analysis
 
-    #add the noramlzied value function and create a new column
-    data['normalized_value'] = data.apply(lambda x: normalized_values(x.high, x.low, x.close), axis = 1)
+def clean_dataset(df):
+    # Make a copy to avoid modifying the original
+    df_clean = df.copy()
+    
+    # Handle missing values
+    def handle_missing_values(df):
+        # Fill numeric columns with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+            
+        # Fill categorical columns with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+
+        for col in categorical_cols:
+            mode = df[col].mode()[0]
+            if mode == 'nan':
+                print(f'{col} has been removed due to nan being the mode.' )
+                df.drop(col, axis=1, inplace=True )
+            else:
+                df[col] = df[col].fillna(mode).replace('nan', mode).replace('nota', mode)
+            
+        return df
+    
+    
+    # Handle outliers using IQR method
+    def handle_outliers(df, columns):
+        for column in columns:
+            Q1 = df[column].quantile(0.05)
+            Q3 = df[column].quantile(0.95)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df[column] = df[column].clip(lower=lower_bound, upper=upper_bound)
+        return df
+    
+    
+    # Standardize text data
+    def clean_text_columns(df):
+        text_columns = df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            # Convert to string type, remove whitespace, make lower
+            df[col] = df[col].astype(str).str.strip().str.lower()
+        
+
+        return df
+    
+    numeric_columns = df_clean.select_dtypes(include=[np.number]).columns
+    df_clean = handle_outliers(df_clean, numeric_columns)
+
+    df_clean = clean_text_columns(df_clean)
+    
+    # 5. Handle missing values after other cleaning steps
+    df_clean = handle_missing_values(df_clean)
+
+    df_clean = df_clean.drop_duplicates()
+    
+    
+    return df_clean
+    
+def extract_features(data, n = 10):
+    data['normalized_value'] = data.apply(lambda x: print(x) normalized_values(x.high, x.low, x.close), axis = 1)
     
     #column with local minima and maxima
     data['loc_min'] = data.iloc[argrelextrema(data.close.values, np.less_equal, order = n)[0]]['close']
@@ -79,10 +153,10 @@ def get_data(sym, start_date = None, end_date = None, n = 10):
     
     return data, idx_with_mins, idx_with_maxs
 
-def create_train_data(stock, start_date = None, end_date = None, n = 10):
+def create_train_data(data, n = 10):
 
     #get data to a dataframe
-    data, idxs_with_mins, idxs_with_maxs = get_data(stock, start_date, end_date, n)
+    data, idxs_with_mins, idxs_with_maxs = extract_features(data, n)
     
     #create regressions for 3, 5 and 10 days
     data = n_day_regression(3, data, list(idxs_with_mins) + list(idxs_with_maxs))
@@ -101,12 +175,12 @@ def create_train_data(stock, start_date = None, end_date = None, n = 10):
     
     return _data_.dropna(axis = 0)
 
-def create_test_data_lr(stock, start_date = None, end_date = None, n = 10):
+def create_test_data_lr(data, n = 10):
     """
     this function create test data sample for logistic regression model
     """
     #get data to a dataframe
-    data, _, _ = get_data(stock, start_date, end_date, n)
+    data = extract_features(data, n)
     idxs = np.arange(0, len(data))
     
     #create regressions for 3, 5 and 10 days
@@ -120,10 +194,10 @@ def create_test_data_lr(stock, start_date = None, end_date = None, n = 10):
 
     return data.dropna(axis = 0)
 
-def predict_trend(stock, _model_, start_date = None, end_date = None, n = 10):
+def predict_trend(data, n = 10):
 
     #get data to a dataframe
-    data, _, _ = get_data(stock, start_date, end_date, n)
+    data = extract_features(data, n)
     
     idxs = np.arange(0, len(data))
     #create regressions for 3, 5 and 10 days

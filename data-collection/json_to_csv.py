@@ -6,7 +6,7 @@ with open('C:\\Users\\Joel\\projects\\MarginCall\\data-collection\\data.json', '
     data = json.load(f)
 
 # Create DataFrame with specified headers
-df = pd.DataFrame(data, columns=['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
+df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
 # Save to CSV
 df.to_csv('new.csv', index=False)
