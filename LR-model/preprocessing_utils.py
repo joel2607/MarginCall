@@ -26,24 +26,57 @@ def linear_regression(x, y):
 
 def n_day_regression(n, df, idxs):
     """
-    n day regression.
+    n day regression with proper index handling.
+    
+    Parameters:
+    n (int): Number of days for regression window
+    df (pandas.DataFrame): DataFrame with price data
+    idxs (list): List of indices to calculate regression for
+    
+    Returns:
+    pandas.DataFrame: DataFrame with new regression column
     """
-    #variable
+    # Create a copy to avoid modifying the original
+    df = df.copy()
+    
+    # Variable name for the regression column
     _varname_ = f'{n}_reg'
     df[_varname_] = np.nan
-
-    for idx in idxs:
-        if idx > n:
-            
-            y = df['close'][idx - n: idx].to_numpy()
-            x = np.arange(0, n)
-            #reshape
+    
+    # Filter idxs to only include those present in df
+    valid_idxs = [idx for idx in idxs if idx < len(df)]
+    
+    for i, idx in enumerate(valid_idxs):
+        if i == 0:
+            # For first point, use the slope between first two points if available
+            if len(df) > 1:
+                y = df['close'].iloc[0:2].to_numpy()
+                x = np.array([0, 1])
+                y = y.reshape(y.shape[0], 1)
+                x = x.reshape(x.shape[0], 1)
+                coef = linear_regression(x, y)
+                df.iloc[idx, df.columns.get_loc(_varname_)] = coef
+            else:
+                df.iloc[idx, df.columns.get_loc(_varname_)] = 0
+                
+        elif i < n:
+            # For points before n, use available historical data
+            y = df['close'].iloc[0:i+1].to_numpy()
+            x = np.arange(0, i+1)
             y = y.reshape(y.shape[0], 1)
             x = x.reshape(x.shape[0], 1)
-            #calculate regression coefficient 
             coef = linear_regression(x, y)
-            df.loc[idx, _varname_] = coef #add the new value
+            df.iloc[idx, df.columns.get_loc(_varname_)] = coef
             
+        else:
+            # Normal case - use full n-day window
+            y = df['close'].iloc[idx-n:idx].to_numpy()
+            x = np.arange(0, n)
+            y = y.reshape(y.shape[0], 1)
+            x = x.reshape(x.shape[0], 1)
+            coef = linear_regression(x, y)
+            df.iloc[idx, df.columns.get_loc(_varname_)] = coef
+    
     return df
 
 def normalized_values(high, low, close):
@@ -194,36 +227,53 @@ def create_test_data_lr(data, _model_, n = 10):
 
     return data.dropna(axis = 0)
 
-def predict_trend(data, n = 10):
-
-    #get data to a dataframe
-    data = extract_features(data, n)
+def predict_trend(data, model, n=10):
+    """
+    Predicts trends in financial data using the provided model while maintaining DataFrame structure.
     
-    idxs = np.arange(0, len(data))
-    #create regressions for 3, 5 and 10 days
-    data = n_day_regression(3, data, idxs)
-    data = n_day_regression(5, data, idxs)
-    data = n_day_regression(10, data, idxs)
-    data = n_day_regression(20, data, idxs)
-        
-    #create a column for predicted value
-    data['pred'] = np.nan
-
-    #get data
+    Parameters:
+    data (pandas.DataFrame): Input DataFrame with financial data
+    model: Trained prediction model
+    n (int): Window size for feature extraction
+    
+    Returns:
+    pandas.DataFrame: DataFrame with predictions
+    """
+    # Create a copy to avoid modifying the original
+    data_processed = data.copy()
+    
+    # Extract features while maintaining original index
+    data_processed, _, _ = extract_features(data_processed, n)
+    
+    # Calculate regression features
+    idxs = np.arange(len(data_processed))
+    data_processed = n_day_regression(3, data_processed, idxs)
+    data_processed = n_day_regression(5, data_processed, idxs)
+    data_processed = n_day_regression(10, data_processed, idxs)
+    data_processed = n_day_regression(20, data_processed, idxs)
+    
+    # Select needed columns
     cols = ['volume', 'normalized_value', '3_reg', '5_reg', '10_reg', '20_reg']
-    x = data[cols]
-
-    #scale the x data
+    x = data_processed[cols]
+    
+    # Handle any remaining missing values
+    x = x.fillna(method='ffill').fillna(method='bfill')
+    
+    # Scale the features
     scaler = MinMaxScaler()
-    x = scaler.fit_transform(x)
-
-    for i in range(x.shape[0]):
-        
+    x_scaled = scaler.fit_transform(x)
+    
+    # Initialize predictions column
+    data_processed['pred'] = np.nan
+    
+    # Make predictions using the DataFrame's existing index
+    for idx in range(len(x_scaled)):
+        x_set = x_scaled[idx, :].reshape(1, -1)
         try:
-            data['pred'][i] = _model_.predict(x[i, :])
-
-        except:
-            data['pred'][i] = np.nan
-
-    return data
-
+            data_processed.iloc[idx, data_processed.columns.get_loc('pred')] = model.predict(x_set)
+        except Exception as err:
+            print(f"Exception occurred at index {idx}")
+            print(err)
+            data_processed.iloc[idx, data_processed.columns.get_loc('pred')] = np.nan
+    
+    return data_processed
