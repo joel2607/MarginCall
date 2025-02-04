@@ -1,4 +1,4 @@
-let { SmartAPI, WebSocket,WebSocketV2 } = require('smartapi-javascript');
+let { SmartAPI} = require('smartapi-javascript');
 const { TOTP  } = require('totp-generator')
 require('dotenv').config();
 const fs = require('fs').promises;
@@ -59,7 +59,7 @@ const processRequest = async (symbolToken, from, to) => {
     const response = await smart_api.getCandleData({
         exchange: "NSE",
         symboltoken: symbolToken,
-        interval: "ONE_MINUTE",
+        interval: "FIVE_MINUTE",
         fromdate: from,
         todate: to
     });
@@ -67,36 +67,36 @@ const processRequest = async (symbolToken, from, to) => {
         appendJsonToFile('data.json', response.data);
         console.log(`Saved data from ${from} to ${to}`);     
     }
-    else{
-        
+    else{        
         console.log('Failed response');
         console.log(response)
     }
 }
-const loginNow = async () => {
 
+const loginNow = async () => {
     const login = await smart_api.generateSession(process.env.ANGEL_ONE_CLIENT_ID, process.env.ANGEL_ONE_CLIENT_PIN, getTOTP())
     console.log(`Session Generated: ${login.status}`);
+    //console.log(login)
 }
 
 const getRequests = async () => {
     try {
-        const startDate = new Date('2018-03-27T12:00:00');
-        const endDate = new Date('2024-02-10T09:00:00');
-        const maxDaysPerRequest = 30;
+        console.log("get begin")
+        const startDate = new Date('2018-01-01T09:20:00');
+        const endDate = new Date('2024-12-31T09:20:00');
+        const maxDaysPerRequest = 90;
 
         let currentStart = new Date(startDate);
         let i = 0;
+        
         while (currentStart < endDate) {
 
             
-            //Refresh login and TOTP 
+            //Refresh login and TOTP
             if(i %3 == 0) await loginNow();
             i++;
-            
-            //5 second delay to prevent getting ratelimited
+            //3 second delay to prevent getting ratelimited
             await sleep(3000);
-
             const currentEnd = new Date(Math.min(currentStart.getTime() + maxDaysPerRequest * 24 * 60 * 60 * 1000, endDate.getTime()));
             await sleep(3000);
             processRequest("14366", formatDate(currentStart), formatDate(currentEnd));

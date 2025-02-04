@@ -188,8 +188,14 @@ def extract_features(data, n = 10):
 
 def create_train_data(data, n = 10):
 
-    #get data to a dataframe
+    print("Initial data shape:", data.shape)
+    
+    # Get data to a dataframe
     data, idxs_with_mins, idxs_with_maxs = extract_features(data, n)
+    
+    # Print shapes of mins and maxs
+    print("Indices with mins:", len(idxs_with_mins))
+    print("Indices with maxs:", len(idxs_with_maxs))
     
     #create regressions for 3, 5 and 10 days
     data = n_day_regression(3, data, list(idxs_with_mins) + list(idxs_with_maxs))
@@ -227,6 +233,12 @@ def create_test_data_lr(data, _model_, n = 10):
 
     return data.dropna(axis = 0)
 
+def _threshold(predictions, threshold):
+
+        prob_thresholded = [0 if x > threshold else 1 for x in predictions[:, 0]]
+
+        return np.array(prob_thresholded)
+
 def predict_trend(data, model, n=10):
     """
     Predicts trends in financial data using the provided model while maintaining DataFrame structure.
@@ -257,7 +269,7 @@ def predict_trend(data, model, n=10):
     x = data_processed[cols]
     
     # Handle any remaining missing values
-    x = x.fillna(method='ffill').fillna(method='bfill')
+    # x = x.fillna(method='ffill').fillna(method='bfill')
     
     # Scale the features
     scaler = MinMaxScaler()
@@ -265,15 +277,18 @@ def predict_trend(data, model, n=10):
     
     # Initialize predictions column
     data_processed['pred'] = np.nan
+    data_processed['threshold_pred'] = np.nan
     
     # Make predictions using the DataFrame's existing index
     for idx in range(len(x_scaled)):
         x_set = x_scaled[idx, :].reshape(1, -1)
         try:
             data_processed.iloc[idx, data_processed.columns.get_loc('pred')] = model.predict(x_set)
+            data_processed.iloc[idx, data_processed.columns.get_loc('threshold_pred')] = _threshold(model._predict_proba_lr(x_set), 0.98)
         except Exception as err:
             print(f"Exception occurred at index {idx}")
             print(err)
             data_processed.iloc[idx, data_processed.columns.get_loc('pred')] = np.nan
+            data_processed.iloc[idx, data_processed.columns.get_loc('threshold_pred')] = np.nan
     
     return data_processed
