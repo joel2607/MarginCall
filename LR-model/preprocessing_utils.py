@@ -141,7 +141,7 @@ def clean_dataset(df):
     return df_clean
     
 def extract_features(data, n = 10):
-    data['normalized_value'] = data.apply(lambda x: print(x) normalized_values(x.high, x.low, x.close), axis = 1)
+    data['normalized_value'] = data.apply(lambda x: normalized_values(x.high, x.low, x.close), axis = 1)
     
     #column with local minima and maxima
     data['loc_min'] = data.iloc[argrelextrema(data.close.values, np.less_equal, order = n)[0]]['close']
@@ -175,7 +175,7 @@ def create_train_data(data, n = 10):
     
     return _data_.dropna(axis = 0)
 
-def create_test_data_lr(data, n = 10):
+def create_test_data_lr(data, _model_, n = 10):
     """
     this function create test data sample for logistic regression model
     """
